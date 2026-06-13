@@ -7,13 +7,48 @@ nest_asyncio.apply()
 
 initialize_st_page(title="Credentials", icon="🔑")
 
-# Page content
+
+# --- Helper functions ---
+
+def _safe_rerun():
+    """Fragment-scoped rerun with fallback."""
+    try:
+        st.rerun(scope="fragment")
+    except Exception:
+        st.rerun()
+
+
+def _show_feedback():
+    """Display and clear stored feedback message after rerun."""
+    feedback = st.session_state.pop("_cred_feedback", None)
+    if feedback:
+        getattr(st, feedback["type"])(feedback["msg"])
+
+
+def _parse_connector_names(credentials_data):
+    """Parse varying credential formats into deduplicated sorted connector name list."""
+    if isinstance(credentials_data, list):
+        if credentials_data and isinstance(credentials_data[0], str):
+            return sorted(set(c.split(".")[0] for c in credentials_data))
+        elif credentials_data and isinstance(credentials_data[0], dict):
+            return sorted(set(
+                cred.get('connector', cred.get('connector_name', ''))
+                for cred in credentials_data
+                if cred.get('connector') or cred.get('connector_name')
+            ))
+        return []
+    elif isinstance(credentials_data, dict):
+        return sorted(credentials_data.keys())
+    return []
+
+
+# --- Page content ---
+
 client = get_backend_api_client()
 NUM_COLUMNS = 4
 
 
 def get_all_connectors_config_map():
-    # Get fresh client instance inside cached function
     connectors = client.connectors.list_connectors()
     config_map_dict = {}
     for connector_name in connectors:
@@ -26,17 +61,22 @@ def get_all_connectors_config_map():
     return config_map_dict
 
 
-all_connector_config_map = get_all_connectors_config_map()
+if "connector_config_map" not in st.session_state:
+    st.session_state["connector_config_map"] = get_all_connectors_config_map()
+all_connector_config_map = st.session_state["connector_config_map"]
 
 
 @st.fragment
 def accounts_section():
+    _show_feedback()
+
     # Get fresh accounts list
     accounts = client.accounts.list_accounts()
+    st.session_state["credentials_accounts"] = accounts
 
     if accounts:
         n_accounts = len(accounts)
-        # Ensure master_account is first, but handle if it doesn't exist
+        # Ensure master_account is first
         if "master_account" in accounts:
             accounts.remove("master_account")
             accounts.insert(0, "master_account")
@@ -46,7 +86,12 @@ def accounts_section():
                 with cols[j]:
                     st.subheader(f"🏦  {account}")
                     credentials = client.accounts.list_account_credentials(account)
-                    st.json(credentials)
+                    connector_names = _parse_connector_names(credentials)
+                    if connector_names:
+                        for name in connector_names:
+                            st.markdown(f"- `{name}`")
+                    else:
+                        st.caption("No credentials")
     else:
         st.write("No accounts available.")
 
@@ -55,66 +100,47 @@ def accounts_section():
     # Account management actions
     c1, c2, c3 = st.columns([1, 1, 1])
     with c1:
-        # Section to create a new account
         st.header("Create a New Account")
         new_account_name = st.text_input("New Account Name")
         if st.button("Create Account"):
-            new_account_name = new_account_name.replace(" ", "_")
-            if new_account_name:
-                if new_account_name in accounts:
-                    st.warning(f"Account {new_account_name} already exists.")
-                    st.stop()
-                elif new_account_name == "" or all(char == "_" for char in new_account_name):
-                    st.warning("Please enter a valid account name.")
-                    st.stop()
-                response = client.accounts.add_account(new_account_name)
-                st.write(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
-            else:
-                st.write("Please enter an account name.")
+            sanitized = new_account_name.strip().replace(" ", "_").strip("_")
+            if not sanitized:
+                st.warning("Please enter an account name.")
+                st.stop()
+            if not all(c.isalnum() or c == "_" for c in sanitized):
+                st.warning("Account name can only contain letters, numbers, and underscores.")
+                st.stop()
+            if sanitized in accounts:
+                st.warning(f"Account '{sanitized}' already exists.")
+                st.stop()
+            response = client.accounts.add_account(sanitized)
+            st.session_state["_cred_feedback"] = {
+                "type": "success",
+                "msg": f"Account '{sanitized}' created successfully."
+            }
+            _safe_rerun()
 
     with c2:
-        # Section to delete an existing account
         st.header("Delete an Account")
         delete_account_name = st.selectbox("Select Account to Delete",
-                                           options=accounts if accounts else ["No accounts available"], )
+                                           options=accounts if accounts else ["No accounts available"])
         if st.button("Delete Account"):
             if delete_account_name and delete_account_name != "No accounts available":
                 response = client.accounts.delete_account(delete_account_name)
-                st.warning(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
+                st.session_state["_cred_feedback"] = {
+                    "type": "success",
+                    "msg": f"Account '{delete_account_name}' deleted."
+                }
+                _safe_rerun()
             else:
-                st.write("Please select a valid account.")
+                st.warning("Please select a valid account.")
 
     with c3:
-        # Section to delete a credential from an existing account
         st.header("Delete Credential")
         delete_account_cred_name = st.selectbox("Select the credentials account",
-                                                options=accounts if accounts else ["No accounts available"], )
+                                                options=accounts if accounts else ["No accounts available"])
         credentials_data = client.accounts.list_account_credentials(delete_account_cred_name)
-        # Handle different possible return formats
-        if isinstance(credentials_data, list):
-            # If it's a list of strings in format "connector.key"
-            if credentials_data and isinstance(credentials_data[0], str):
-                creds_for_account = [credential.split(".")[0] for credential in credentials_data]
-            # If it's a list of dicts, extract connector names
-            elif credentials_data and isinstance(credentials_data[0], dict):
-                creds_for_account = list(
-                    set([cred.get('connector', cred.get('connector_name', '')) for cred in credentials_data if
-                         cred.get('connector') or cred.get('connector_name')]))
-            else:
-                creds_for_account = []
-        elif isinstance(credentials_data, dict):
-            # If it's a dict with connectors as keys
-            creds_for_account = list(credentials_data.keys())
-        else:
-            creds_for_account = []
+        creds_for_account = _parse_connector_names(credentials_data)
         delete_cred_name = st.selectbox("Select a Credential to Delete",
                                         options=creds_for_account if creds_for_account else [
                                             "No credentials available"])
@@ -122,18 +148,16 @@ def accounts_section():
             if (delete_account_cred_name and delete_account_cred_name != "No accounts available") and \
                     (delete_cred_name and delete_cred_name != "No credentials available"):
                 response = client.accounts.delete_credential(delete_account_cred_name, delete_cred_name)
-                st.warning(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
+                st.session_state["_cred_feedback"] = {
+                    "type": "success",
+                    "msg": f"Credential '{delete_cred_name}' removed from '{delete_account_cred_name}'."
+                }
+                _safe_rerun()
             else:
-                st.write("Please select a valid account.")
-
-    return accounts
+                st.warning("Please select a valid account and credential.")
 
 
-accounts = accounts_section()
+accounts_section()
 
 st.markdown("---")
 
@@ -142,6 +166,8 @@ st.markdown("---")
 @st.fragment
 def add_credentials_section():
     st.header("Add Credentials")
+    accounts = st.session_state.get("credentials_accounts", [])
+
     c1, c2 = st.columns([1, 1])
     with c1:
         account_name = st.selectbox("Select Account", options=accounts if accounts else ["No accounts available"])
@@ -157,27 +183,15 @@ def add_credentials_section():
 
     # Custom logic for XRPL connector
     if connector_name == "xrpl":
-        # Define custom XRPL fields with default values
         xrpl_fields = {
             "xrpl_secret_key": "",
             "wss_node_urls": "wss://xrplcluster.com,wss://s1.ripple.com,wss://s2.ripple.com",
         }
-
-        # Display XRPL-specific fields
         for field, default_value in xrpl_fields.items():
             if field == "xrpl_secret_key":
                 config_inputs[field] = st.text_input(field, type="password", key=f"{connector_name}_{field}")
             else:
                 config_inputs[field] = st.text_input(field, value=default_value, key=f"{connector_name}_{field}")
-
-        if st.button("Submit Credentials"):
-            response = client.accounts.add_credential(account_name, connector_name, config_inputs)
-            if response:
-                st.success(f"✅ Successfully added {connector_name} connector to {account_name}!")
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
     else:
         # Default behavior for other connectors
         cols = st.columns(NUM_COLUMNS)
@@ -185,10 +199,21 @@ def add_credentials_section():
             with cols[i % (NUM_COLUMNS - 1)]:
                 config_inputs[config] = st.text_input(config, type="password", key=f"{connector_name}_{config}")
 
-        with cols[-1]:
-            if st.button("Submit Credentials"):
-                response = client.accounts.add_credential(account_name, connector_name, config_inputs)
-                st.write(response)
+    # Unified submit logic for all connectors
+    if st.button("Submit Credentials"):
+        empty_fields = [k for k, v in config_inputs.items() if not v.strip()]
+        if empty_fields:
+            st.error(f"Please fill in: {', '.join(empty_fields)}")
+            st.stop()
+        response = client.accounts.add_credential(account_name, connector_name, config_inputs)
+        if response:
+            st.session_state["_cred_feedback"] = {
+                "type": "success",
+                "msg": f"Successfully added {connector_name} to {account_name}!"
+            }
+            _safe_rerun()
+        else:
+            st.error(f"Failed to add credentials for {connector_name}.")
 
 
 add_credentials_section()
