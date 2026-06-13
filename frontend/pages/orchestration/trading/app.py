@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from frontend.st_utils import get_backend_api_client, initialize_st_page
+from frontend.st_utils import get_backend_api_client, initialize_st_page, require_auth
 
 # Enable nested async
 nest_asyncio.apply()
@@ -16,6 +16,7 @@ initialize_st_page(
     layout="wide",
     show_readme=False
 )
+require_auth()
 
 # Initialize backend client
 backend_api_client = get_backend_api_client()

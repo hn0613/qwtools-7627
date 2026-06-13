@@ -68,7 +68,7 @@ The dashboard uses `admin` and `abc` as the default username and password respec
         logged_in: False
         password: abc
   cookie:
-    expiry_days: 0
+    expiry_days: 1
     key: some_signature_key # Must be string
     name: some_cookie_name
   pre-authorized:
@@ -114,10 +114,6 @@ The dashboard uses `admin` and `abc` as the default username and password respec
 - Change the value from `False` to `True` to enable dashboard authentication.
 - Save the CONFIG.py file.
 - Relaunch dashboard by running `make run`
-
-### Known Issues
-- Refreshing the browser window may log you out and display the login screen again. This is a known issue that might be addressed in future updates.
-
 
 ## Latest Updates
 

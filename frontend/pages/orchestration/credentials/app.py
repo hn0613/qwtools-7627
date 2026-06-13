@@ -1,11 +1,12 @@
 import nest_asyncio
 import streamlit as st
 
-from frontend.st_utils import get_backend_api_client, initialize_st_page
+from frontend.st_utils import get_backend_api_client, initialize_st_page, require_auth
 
 nest_asyncio.apply()
 
 initialize_st_page(title="Credentials", icon="🔑")
+require_auth()
 
 # Page content
 client = get_backend_api_client()

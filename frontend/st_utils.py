@@ -121,6 +121,13 @@ def get_backend_api_client():
     return st.session_state.backend_api_client
 
 
+def require_auth():
+    """Page-level auth guard. Call at the top of private pages to block unauthenticated access."""
+    if AUTH_SYSTEM_ENABLED and not st.session_state.get("authentication_status"):
+        st.error("Please log in to access this page.")
+        st.stop()
+
+
 def auth_system():
     if not AUTH_SYSTEM_ENABLED:
         return {
@@ -128,33 +135,52 @@ def auth_system():
             **private_pages(),
             **public_pages(),
         }
-    else:
+
+    # Load credentials with error handling
+    try:
         with open('credentials.yml') as file:
             config = yaml.load(file, Loader=SafeLoader)
-        if "authenticator" not in st.session_state or "authentication_status" not in st.session_state or not st.session_state.get(
-                "authentication_status", False):
-            st.session_state.authenticator = stauth.Authenticate(
-                config['credentials'],
-                config['cookie']['name'],
-                config['cookie']['key'],
-                config['cookie']['expiry_days'],
-            )
-            # Show only public pages for non-authenticated users
-            st.session_state.authenticator.login()
-            if st.session_state["authentication_status"] is False:
-                st.error('Username/password is incorrect')
-            elif st.session_state["authentication_status"] is None:
-                st.warning('Please enter your username and password')
-            return {
-                "Main": main_page(),
-                **public_pages()
-            }
-        else:
-            st.session_state.authenticator.logout(location="sidebar")
-            st.sidebar.write(f'Welcome *{st.session_state["name"]}*')
-            # Show all pages for authenticated users
-            return {
-                "Main": main_page(),
-                **private_pages(),
-                **public_pages(),
-            }
+    except FileNotFoundError:
+        st.error("Authentication configuration file 'credentials.yml' not found.")
+        st.stop()
+    except yaml.YAMLError as e:
+        st.error(f"Error parsing 'credentials.yml': {e}")
+        st.stop()
+
+    # Validate required config keys
+    if not config or 'credentials' not in config or 'cookie' not in config:
+        st.error("Invalid 'credentials.yml': missing 'credentials' or 'cookie' section.")
+        st.stop()
+
+    # Create Authenticate object only once per session
+    if "authenticator" not in st.session_state:
+        st.session_state.authenticator = stauth.Authenticate(
+            config['credentials'],
+            config['cookie']['name'],
+            config['cookie']['key'],
+            config['cookie']['expiry_days'],
+        )
+
+    # login() checks cookie first, then shows form if needed
+    st.session_state.authenticator.login()
+
+    if st.session_state.get("authentication_status"):
+        # Authenticated: show logout and all pages
+        st.session_state.authenticator.logout(location="sidebar")
+        st.sidebar.write(f'Welcome *{st.session_state["name"]}*')
+        return {
+            "Main": main_page(),
+            **private_pages(),
+            **public_pages(),
+        }
+
+    # Not authenticated: show feedback and public pages only
+    if st.session_state.get("authentication_status") is False:
+        st.error('Username/password is incorrect')
+    elif st.session_state.get("authentication_status") is None:
+        st.warning('Please enter your username and password')
+
+    return {
+        "Main": main_page(),
+        **public_pages()
+    }

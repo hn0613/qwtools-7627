@@ -2,9 +2,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from frontend.st_utils import get_backend_api_client, initialize_st_page
+from frontend.st_utils import get_backend_api_client, initialize_st_page, require_auth
 
 initialize_st_page(title="Portfolio", icon="💰")
+require_auth()
 
 # Page content
 client = get_backend_api_client()
