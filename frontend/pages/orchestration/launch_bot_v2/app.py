@@ -4,9 +4,10 @@ import time
 import pandas as pd
 import streamlit as st
 
-from frontend.st_utils import get_backend_api_client, initialize_st_page
+from frontend.st_utils import get_backend_api_client, initialize_st_page, require_auth
 
 initialize_st_page(icon="🙌", show_readme=False)
+require_auth()
 
 # Initialize backend client
 backend_api_client = get_backend_api_client()
