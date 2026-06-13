@@ -5,7 +5,7 @@ from frontend.st_utils import get_backend_api_client
 
 nest_asyncio.apply()
 
-def render_save_config(config_base_default: str, config_data: dict):
+def render_save_config(config_base_default: str, config_data: dict, controller_name: str = None):
     st.write("### Upload Config to Hummingbot-API")
     backend_api_client = get_backend_api_client()
     try:
@@ -62,6 +62,8 @@ def render_save_config(config_base_default: str, config_data: dict):
                 config_name=config_name,
                 config=config_data
             )
+            if controller_name:
+                st.session_state.pop(f"config_{controller_name}", None)
             st.session_state.pop("default_config", None)
             st.success("Config uploaded successfully!")
         except Exception as e:

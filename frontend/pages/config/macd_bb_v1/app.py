@@ -2,7 +2,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_controller_config, get_default_config_loader, update_controller_config
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.macd_bb_v1.user_inputs import user_inputs
 from frontend.pages.config.utils import get_candles
@@ -22,7 +22,7 @@ backend_api_client = get_backend_api_client()
 get_default_config_loader("macd_bb_v1")
 # User inputs
 inputs = user_inputs()
-st.session_state["default_config"].update(inputs)
+update_controller_config("macd_bb_v1", inputs)
 
 st.write("### Visualizing MACD Bollinger Trading Signals")
 days_to_visualize = st.number_input("Days to Visualize", min_value=1, max_value=365, value=7)
@@ -62,4 +62,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+_config = get_controller_config("macd_bb_v1")
+render_save_config(_config["id"], _config, controller_name="macd_bb_v1")

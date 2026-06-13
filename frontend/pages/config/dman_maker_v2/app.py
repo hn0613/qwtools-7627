@@ -1,7 +1,7 @@
 import streamlit as st
 
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_controller_config, get_default_config_loader, update_controller_config
 from frontend.components.dca_distribution import get_dca_distribution_inputs
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.dman_maker_v2.user_inputs import user_inputs
@@ -25,7 +25,7 @@ with st.expander("Executor Distribution:", expanded=True):
                                                inputs["sell_amounts_pct"], inputs["total_amount_quote"])
     st.plotly_chart(fig, use_container_width=True)
 
-dca_inputs = get_dca_distribution_inputs()
+dca_inputs = get_dca_distribution_inputs(controller_name="dman_maker_v2")
 
 st.write("### Visualizing DCA Distribution for specific Executor Level")
 st.write("---")
@@ -49,7 +49,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Combine inputs and dca_inputs into final config
 config = {**inputs, **dca_inputs}
-st.session_state["default_config"].update(config)
+update_controller_config("dman_maker_v2", config)
 bt_results = backtesting_section(config, backend_api_client)
 if bt_results:
     fig = create_backtesting_figure(
@@ -65,4 +65,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+_config = get_controller_config("dman_maker_v2")
+render_save_config(_config["id"], _config, controller_name="dman_maker_v2")

@@ -1,17 +1,25 @@
 import streamlit as st
 
+from frontend.components.config_defaults import (
+    BUY_AMOUNTS_PCT, BUY_SPREADS, CUSTOM_SPREAD_BUY_DEFAULTS,
+    CUSTOM_SPREAD_SELL_DEFAULTS, SELL_AMOUNTS_PCT, SELL_SPREADS,
+)
+from frontend.components.config_loader import get_controller_config
 from frontend.components.st_inputs import distribution_inputs, get_distribution, normalize
 
 
-def get_executors_distribution_inputs(use_custom_spread_units=False):
-    default_amounts = [0.2, 0.8]
-    default_config = st.session_state.get("default_config", {})
-    if use_custom_spread_units:
-        buy_spreads = [spread / 100 for spread in default_config.get("buy_spreads", [1, 2])]
-        sell_spreads = [spread / 100 for spread in default_config.get("sell_spreads", [1, 2])]
+def get_executors_distribution_inputs(use_custom_spread_units=False, controller_name: str = None):
+    default_amounts = list(BUY_AMOUNTS_PCT)
+    if controller_name:
+        default_config = get_controller_config(controller_name)
     else:
-        buy_spreads = list(default_config.get("buy_spreads", [0.01, 0.02]))
-        sell_spreads = list(default_config.get("sell_spreads", [0.01, 0.02]))
+        default_config = st.session_state.get("default_config", {})
+    if use_custom_spread_units:
+        buy_spreads = [spread / 100 for spread in default_config.get("buy_spreads", list(CUSTOM_SPREAD_BUY_DEFAULTS))]
+        sell_spreads = [spread / 100 for spread in default_config.get("sell_spreads", list(CUSTOM_SPREAD_SELL_DEFAULTS))]
+    else:
+        buy_spreads = list(default_config.get("buy_spreads", list(BUY_SPREADS)))
+        sell_spreads = list(default_config.get("sell_spreads", list(SELL_SPREADS)))
 
     buy_amounts_pct = default_config.get("buy_amounts_pct", default_amounts.copy())
     sell_amounts_pct = default_config.get("sell_amounts_pct", default_amounts.copy())

@@ -1,20 +1,21 @@
 import streamlit as st
 
+from frontend.components.config_defaults import POSITION_REBALANCE_THRESHOLD_PCT, SKIP_REBALANCE
 from frontend.components.executors_distribution import get_executors_distribution_inputs
 from frontend.components.market_making_general_inputs import get_market_making_general_inputs
 from frontend.components.risk_management import get_risk_management_inputs
 
 
-def user_inputs():
+def user_inputs(controller_name: str = "pmm_simple"):
     default_config = st.session_state.get("default_config", {})
-    position_rebalance_threshold_pct = default_config.get("position_rebalance_threshold_pct", 0.05)
-    skip_rebalance = default_config.get("skip_rebalance", False)
-    
+    position_rebalance_threshold_pct = default_config.get("position_rebalance_threshold_pct", POSITION_REBALANCE_THRESHOLD_PCT)
+    skip_rebalance = default_config.get("skip_rebalance", SKIP_REBALANCE)
+
     connector_name, trading_pair, leverage, total_amount_quote, position_mode, cooldown_time, \
-        executor_refresh_time, _, _, _ = get_market_making_general_inputs()
+        executor_refresh_time, _, _, _ = get_market_making_general_inputs(controller_name=controller_name)
     buy_spread_distributions, sell_spread_distributions, buy_order_amounts_pct, \
-        sell_order_amounts_pct = get_executors_distribution_inputs()
-    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs()
+        sell_order_amounts_pct = get_executors_distribution_inputs(controller_name=controller_name)
+    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs(controller_name)
     
     with st.expander("Position Rebalancing", expanded=True):
         c1, c2 = st.columns(2)

@@ -1,5 +1,9 @@
 import streamlit as st
 
+from frontend.components.config_defaults import (
+    DCA_AMOUNTS, DCA_SPREADS, DCA_STOP_LOSS, DCA_TAKE_PROFIT, DCA_TIME_LIMIT,
+    TRAILING_STOP_ACTIVATION_PRICE, TRAILING_STOP_TRAILING_DELTA,
+)
 from frontend.components.config_loader import get_controller_config
 from frontend.components.st_inputs import distribution_inputs, get_distribution, normalize
 
@@ -11,13 +15,13 @@ def get_dca_distribution_inputs(controller_name: str = None):
         else:
             # Fallback for backward compatibility
             default_config = st.session_state.get("default_config", {})
-        dca_spreads = list(default_config.get("dca_spreads", [0.01, 0.02, 0.03]))
-        dca_amounts = list(default_config.get("dca_amounts", [0.2, 0.5, 0.3]))
-        tp = default_config.get("take_profit", 0.01) * 100
-        sl = default_config.get("stop_loss", 0.02) * 100
-        time_limit = default_config.get("time_limit", 60 * 6 * 60) // 60
-        ts_ap = default_config.get("trailing_stop", {}).get("activation_price", 0.018) * 100
-        ts_delta = default_config.get("trailing_stop", {}).get("trailing_delta", 0.002) * 100
+        dca_spreads = list(default_config.get("dca_spreads", DCA_SPREADS))
+        dca_amounts = list(default_config.get("dca_amounts", DCA_AMOUNTS))
+        tp = default_config.get("take_profit", DCA_TAKE_PROFIT) * 100
+        sl = default_config.get("stop_loss", DCA_STOP_LOSS) * 100
+        time_limit = default_config.get("time_limit", DCA_TIME_LIMIT) // 60
+        ts_ap = default_config.get("trailing_stop", {}).get("activation_price", TRAILING_STOP_ACTIVATION_PRICE) * 100
+        ts_delta = default_config.get("trailing_stop", {}).get("trailing_delta", TRAILING_STOP_TRAILING_DELTA) * 100
         levels_def = len(dca_spreads)
         c1, c2 = st.columns([0.67, 0.33])
         with c1:

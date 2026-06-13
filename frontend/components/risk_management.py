@@ -1,15 +1,24 @@
 import streamlit as st
 from hummingbot.connector.connector_base import OrderType
 
+from frontend.components.config_defaults import (
+    STOP_LOSS, TAKE_PROFIT, TAKE_PROFIT_ORDER_TYPE, TIME_LIMIT,
+    TRAILING_STOP_ACTIVATION_PRICE, TRAILING_STOP_TRAILING_DELTA,
+)
+from frontend.components.config_loader import get_controller_config
 
-def get_risk_management_inputs():
-    default_config = st.session_state.get("default_config", {})
-    sl = default_config.get("stop_loss", 0.05) * 100
-    tp = default_config.get("take_profit", 0.02) * 100
-    time_limit = default_config.get("time_limit", 60 * 12 * 60) // 60
-    ts_ap = default_config.get("trailing_stop", {}).get("activation_price", 0.018) * 100
-    ts_delta = default_config.get("trailing_stop", {}).get("trailing_delta", 0.002) * 100
-    take_profit_order_type = OrderType(default_config.get("take_profit_order_type", 2))
+
+def get_risk_management_inputs(controller_name: str = None):
+    if controller_name:
+        default_config = get_controller_config(controller_name)
+    else:
+        default_config = st.session_state.get("default_config", {})
+    sl = default_config.get("stop_loss", STOP_LOSS) * 100
+    tp = default_config.get("take_profit", TAKE_PROFIT) * 100
+    time_limit = default_config.get("time_limit", TIME_LIMIT) // 60
+    ts_ap = default_config.get("trailing_stop", {}).get("activation_price", TRAILING_STOP_ACTIVATION_PRICE) * 100
+    ts_delta = default_config.get("trailing_stop", {}).get("trailing_delta", TRAILING_STOP_TRAILING_DELTA) * 100
+    take_profit_order_type = OrderType(default_config.get("take_profit_order_type", TAKE_PROFIT_ORDER_TYPE))
     order_types = [OrderType.LIMIT, OrderType.MARKET]
     order_type_index = order_types.index(take_profit_order_type)
     with st.expander("Risk Management", expanded=True):

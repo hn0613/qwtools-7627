@@ -1,7 +1,7 @@
 import streamlit as st
 
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_controller_config, get_default_config_loader, update_controller_config
 from frontend.components.save_config import render_save_config
 
 # Import submodules
@@ -20,8 +20,7 @@ st.text("This tool will let you create a config for PMM Simple, backtest and upl
 get_default_config_loader("pmm_simple")
 
 inputs = user_inputs()
-
-st.session_state["default_config"].update(inputs)
+update_controller_config("pmm_simple", inputs)
 with st.expander("Executor Distribution:", expanded=True):
     fig = create_executors_distribution_traces(inputs["buy_spreads"], inputs["sell_spreads"], inputs["buy_amounts_pct"],
                                                inputs["sell_amounts_pct"], inputs["total_amount_quote"])
@@ -42,4 +41,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+_config = get_controller_config("pmm_simple")
+render_save_config(_config["id"], _config, controller_name="pmm_simple")

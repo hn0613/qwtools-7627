@@ -1,20 +1,30 @@
 import streamlit as st
 
+from frontend.components.config_defaults import (
+    CANDLES_CONNECTOR, CANDLES_TRADING_PAIR, CONNECTOR_NAME, COOLDOWN_TIME,
+    INTERVAL, LEVERAGE, MAX_EXECUTORS_PER_SIDE, POSITION_MODE, TOTAL_AMOUNT_QUOTE,
+    TRADING_PAIR,
+)
+from frontend.components.config_loader import get_controller_config
 
-def get_directional_trading_general_inputs():
+
+def get_directional_trading_general_inputs(controller_name: str = None):
     with st.expander("General Settings", expanded=True):
         c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        default_config = st.session_state.get("default_config", {})
-        connector_name = default_config.get("connector_name", "kucoin")
-        trading_pair = default_config.get("trading_pair", "WLD-USDT")
-        leverage = default_config.get("leverage", 20)
-        total_amount_quote = default_config.get("total_amount_quote", 1000)
-        max_executors_per_side = default_config.get("max_executors_per_side", 5)
-        cooldown_time = default_config.get("cooldown_time", 60 * 60) / 60
-        position_mode = 0 if default_config.get("position_mode", "HEDGE") == "HEDGE" else 1
-        candles_connector_name = default_config.get("candles_connector_name", "kucoin")
-        candles_trading_pair = default_config.get("candles_trading_pair", "WLD-USDT")
-        interval = default_config.get("interval", "3m")
+        if controller_name:
+            default_config = get_controller_config(controller_name)
+        else:
+            default_config = st.session_state.get("default_config", {})
+        connector_name = default_config.get("connector_name", CONNECTOR_NAME)
+        trading_pair = default_config.get("trading_pair", TRADING_PAIR)
+        leverage = default_config.get("leverage", LEVERAGE)
+        total_amount_quote = default_config.get("total_amount_quote", TOTAL_AMOUNT_QUOTE)
+        max_executors_per_side = default_config.get("max_executors_per_side", MAX_EXECUTORS_PER_SIDE)
+        cooldown_time = default_config.get("cooldown_time", COOLDOWN_TIME) / 60
+        position_mode = 0 if default_config.get("position_mode", POSITION_MODE) == "HEDGE" else 1
+        candles_connector_name = default_config.get("candles_connector_name", CANDLES_CONNECTOR)
+        candles_trading_pair = default_config.get("candles_trading_pair", CANDLES_TRADING_PAIR)
+        interval = default_config.get("interval", INTERVAL)
         intervals = ["1m", "3m", "5m", "15m", "1h", "4h", "1d", "1s"]
         interval_index = intervals.index(interval)
 

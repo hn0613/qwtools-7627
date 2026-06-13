@@ -4,11 +4,11 @@ from frontend.components.executors_distribution import get_executors_distributio
 from frontend.components.market_making_general_inputs import get_market_making_general_inputs
 
 
-def user_inputs():
+def user_inputs(controller_name: str = "dman_maker_v2"):
     connector_name, trading_pair, leverage, total_amount_quote, position_mode, cooldown_time,\
-        executor_refresh_time, _, _, _ = get_market_making_general_inputs()
+        executor_refresh_time, _, _, _ = get_market_making_general_inputs(controller_name=controller_name)
     buy_spread_distributions, sell_spread_distributions, buy_order_amounts_pct, \
-        sell_order_amounts_pct = get_executors_distribution_inputs()
+        sell_order_amounts_pct = get_executors_distribution_inputs(controller_name=controller_name)
     with st.expander("Custom D-Man Maker V2 Settings"):
         c1, c2 = st.columns(2)
         with c1:
