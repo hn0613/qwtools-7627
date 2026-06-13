@@ -145,15 +145,25 @@ def reset_controller_config(controller_name: str) -> None:
     """
     config_key = f"config_{controller_name}"
     loader_key = f"config_loader_initialized_{controller_name}"
-    
+
     # Clear controller-specific state
     st.session_state.pop(config_key, None)
     st.session_state.pop(loader_key, None)
-    
+
     # Clear related UI state
     st.session_state.pop(f"use_default_{controller_name}", None)
     st.session_state.pop(f"config_select_{controller_name}", None)
-    
+
     # Clear legacy state if it matches this controller
     if st.session_state.get("default_config", {}).get("controller_name") == controller_name:
         st.session_state.pop("default_config", None)
+
+
+def get_config_for_save(controller_name: str) -> tuple:
+    """
+    Return (config_id, config_data) suitable for passing to render_save_config.
+    Reads from the controller-specific key as the authoritative source.
+    """
+    config = get_controller_config(controller_name)
+    config_id = config.get("id", "")
+    return config_id, config

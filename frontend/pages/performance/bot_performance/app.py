@@ -15,7 +15,6 @@ from frontend.visualization.performance_etl import display_etl_section
 
 async def main():
     initialize_st_page(title="Bot Performance", icon="🚀", initial_sidebar_state="collapsed")
-    st.session_state["default_config"] = {}
     backend_api = get_backend_api_client()
 
     st.subheader("🔫 DATA SOURCE")

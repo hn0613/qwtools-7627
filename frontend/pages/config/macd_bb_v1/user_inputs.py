@@ -1,11 +1,12 @@
 import streamlit as st
 
+from frontend.components.config_loader import get_controller_config
 from frontend.components.directional_trading_general_inputs import get_directional_trading_general_inputs
 from frontend.components.risk_management import get_risk_management_inputs
 
 
-def user_inputs():
-    default_config = st.session_state.get("default_config", {})
+def user_inputs(controller_name: str = "macd_bb_v1"):
+    default_config = get_controller_config(controller_name)
     bb_length = default_config.get("bb_length", 100)
     bb_std = default_config.get("bb_std", 2.0)
     bb_long_threshold = default_config.get("bb_long_threshold", 0.0)
@@ -14,8 +15,8 @@ def user_inputs():
     macd_slow = default_config.get("macd_slow", 42)
     macd_signal = default_config.get("macd_signal", 9)
     connector_name, trading_pair, leverage, total_amount_quote, max_executors_per_side, cooldown_time, position_mode,\
-        candles_connector_name, candles_trading_pair, interval = get_directional_trading_general_inputs()
-    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs()
+        candles_connector_name, candles_trading_pair, interval = get_directional_trading_general_inputs(controller_name=controller_name)
+    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs(controller_name=controller_name)
     with st.expander("MACD Bollinger Configuration", expanded=True):
         c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         with c1:

@@ -1,9 +1,14 @@
 import streamlit as st
 from hummingbot.connector.connector_base import OrderType
 
+from frontend.components.config_loader import get_controller_config
 
-def get_risk_management_inputs():
-    default_config = st.session_state.get("default_config", {})
+
+def get_risk_management_inputs(controller_name: str = None):
+    if controller_name:
+        default_config = get_controller_config(controller_name)
+    else:
+        default_config = st.session_state.get("default_config", {})
     sl = default_config.get("stop_loss", 0.05) * 100
     tp = default_config.get("take_profit", 0.02) * 100
     time_limit = default_config.get("time_limit", 60 * 12 * 60) // 60

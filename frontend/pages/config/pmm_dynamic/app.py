@@ -4,7 +4,7 @@ from plotly.subplots import make_subplots
 
 # Import submodules
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_default_config_loader, update_controller_config, get_config_for_save
 from frontend.components.executors_distribution import get_executors_distribution_inputs
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.pmm_dynamic.spread_and_price_multipliers import get_pmm_dynamic_multipliers
@@ -22,10 +22,11 @@ from frontend.visualization.utils import add_traces_to_fig
 # Initialize the Streamlit page
 initialize_st_page(title="PMM Dynamic", icon="👩‍🏫")
 backend_api_client = get_backend_api_client()
+CONTROLLER_NAME = "pmm_dynamic"
 
 # Page content
 st.text("This tool will let you create a config for PMM Dynamic, backtest and upload it to the Backend API.")
-get_default_config_loader("pmm_dynamic")
+get_default_config_loader(CONTROLLER_NAME)
 # Get user inputs
 inputs = user_inputs()
 st.write("### Visualizing MACD and NATR indicators for PMM Dynamic")
@@ -61,12 +62,12 @@ st.write("### Executors Distribution")
 st.write("The order distributions are affected by the average NATR. This means that if the first order has a spread of "
          "1 and the NATR is 0.005, the first order will have a spread of 0.5% of the mid price.")
 buy_spread_distributions, sell_spread_distributions, buy_order_amounts_pct, \
-    sell_order_amounts_pct = get_executors_distribution_inputs(use_custom_spread_units=True)
+    sell_order_amounts_pct = get_executors_distribution_inputs(use_custom_spread_units=True, controller_name=CONTROLLER_NAME)
 inputs["buy_spreads"] = [spread * 100 for spread in buy_spread_distributions]
 inputs["sell_spreads"] = [spread * 100 for spread in sell_spread_distributions]
 inputs["buy_amounts_pct"] = buy_order_amounts_pct
 inputs["sell_amounts_pct"] = sell_order_amounts_pct
-st.session_state["default_config"].update(inputs)
+update_controller_config(CONTROLLER_NAME, inputs)
 with st.expander("Executor Distribution:", expanded=True):
     natr_avarage = spreads_multiplier.mean()
     buy_spreads = [spread * natr_avarage for spread in inputs["buy_spreads"]]
@@ -91,4 +92,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+config_id, config_data = get_config_for_save(CONTROLLER_NAME)
+render_save_config(config_id, config_data, controller_name=CONTROLLER_NAME)

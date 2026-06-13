@@ -3,7 +3,7 @@ import streamlit as st
 from hummingbot.core.data_type.common import TradeType
 from plotly.subplots import make_subplots
 
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_default_config_loader, update_controller_config, get_config_for_save
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.grid_strike.user_inputs import user_inputs
 from frontend.pages.config.utils import get_candles
@@ -54,11 +54,12 @@ def get_grid_trace(start_price, end_price, limit_price):
 # Initialize the Streamlit page
 initialize_st_page(title="Grid Strike Grid Component", icon="📊", initial_sidebar_state="expanded")
 backend_api_client = get_backend_api_client()
+CONTROLLER_NAME = "grid_strike"
 
-get_default_config_loader("grid_strike")
+get_default_config_loader(CONTROLLER_NAME)
 # User inputs
 inputs = user_inputs()
-st.session_state["default_config"].update(inputs)
+update_controller_config(CONTROLLER_NAME, inputs)
 
 # Load candle data
 candles = get_candles(
@@ -157,5 +158,5 @@ def prepare_config_for_save(config):
 
 
 # Render save config component
-render_save_config(st.session_state["default_config"]["id"],
-                   prepare_config_for_save(st.session_state["default_config"])) 
+config_id, config_data = get_config_for_save(CONTROLLER_NAME)
+render_save_config(config_id, prepare_config_for_save(config_data), controller_name=CONTROLLER_NAME) 

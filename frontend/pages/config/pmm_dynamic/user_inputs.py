@@ -1,11 +1,12 @@
 import streamlit as st
 
+from frontend.components.config_loader import get_controller_config
 from frontend.components.market_making_general_inputs import get_market_making_general_inputs
 from frontend.components.risk_management import get_risk_management_inputs
 
 
-def user_inputs():
-    default_config = st.session_state.get("default_config", {})
+def user_inputs(controller_name: str = "pmm_dynamic"):
+    default_config = get_controller_config(controller_name)
     macd_fast = default_config.get("macd_fast", 21)
     macd_slow = default_config.get("macd_slow", 42)
     macd_signal = default_config.get("macd_signal", 9)
@@ -14,8 +15,8 @@ def user_inputs():
     skip_rebalance = default_config.get("skip_rebalance", False)
     
     connector_name, trading_pair, leverage, total_amount_quote, position_mode, cooldown_time, executor_refresh_time, \
-        candles_connector, candles_trading_pair, interval = get_market_making_general_inputs(custom_candles=True)
-    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs()
+        candles_connector, candles_trading_pair, interval = get_market_making_general_inputs(custom_candles=True, controller_name=controller_name)
+    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs(controller_name=controller_name)
     with st.expander("PMM Dynamic Configuration", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
         with c1:

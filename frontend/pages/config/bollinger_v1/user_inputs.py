@@ -1,18 +1,19 @@
 import streamlit as st
 
+from frontend.components.config_loader import get_controller_config
 from frontend.components.directional_trading_general_inputs import get_directional_trading_general_inputs
 from frontend.components.risk_management import get_risk_management_inputs
 
 
-def user_inputs():
-    default_config = st.session_state.get("default_config", {})
+def user_inputs(controller_name: str = "bollinger_v1"):
+    default_config = get_controller_config(controller_name)
     bb_length = default_config.get("bb_length", 100)
     bb_std = default_config.get("bb_std", 2.0)
     bb_long_threshold = default_config.get("bb_long_threshold", 0.0)
     bb_short_threshold = default_config.get("bb_short_threshold", 1.0)
     connector_name, trading_pair, leverage, total_amount_quote, max_executors_per_side, cooldown_time, position_mode, \
-        candles_connector_name, candles_trading_pair, interval = get_directional_trading_general_inputs()
-    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs()
+        candles_connector_name, candles_trading_pair, interval = get_directional_trading_general_inputs(controller_name=controller_name)
+    sl, tp, time_limit, ts_ap, ts_delta, take_profit_order_type = get_risk_management_inputs(controller_name=controller_name)
     with st.expander("Bollinger Bands Configuration", expanded=True):
         c1, c2, c3, c4 = st.columns(4)
         with c1:

@@ -3,7 +3,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_default_config_loader, update_controller_config, get_config_for_save
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.bollinger_v1.user_inputs import user_inputs
 from frontend.pages.config.utils import get_candles
@@ -19,12 +19,13 @@ from frontend.visualization.utils import add_traces_to_fig
 # Initialize the Streamlit page
 initialize_st_page(title="Bollinger V1", icon="📈", initial_sidebar_state="expanded")
 backend_api_client = get_backend_api_client()
+CONTROLLER_NAME = "bollinger_v1"
 
 st.text("This tool will let you create a config for Bollinger V1 and visualize the strategy.")
-get_default_config_loader("bollinger_v1")
+get_default_config_loader(CONTROLLER_NAME)
 
 inputs = user_inputs()
-st.session_state["default_config"].update(inputs)
+update_controller_config(CONTROLLER_NAME, inputs)
 
 st.write("### Visualizing Bollinger Bands and Trading Signals")
 days_to_visualize = st.number_input("Days to Visualize", min_value=1, max_value=365, value=7)
@@ -62,4 +63,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+config_id, config_data = get_config_for_save(CONTROLLER_NAME)
+render_save_config(config_id, config_data, controller_name=CONTROLLER_NAME)

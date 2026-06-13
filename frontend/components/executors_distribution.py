@@ -1,11 +1,15 @@
 import streamlit as st
 
+from frontend.components.config_loader import get_controller_config
 from frontend.components.st_inputs import distribution_inputs, get_distribution, normalize
 
 
-def get_executors_distribution_inputs(use_custom_spread_units=False):
+def get_executors_distribution_inputs(use_custom_spread_units=False, controller_name: str = None):
     default_amounts = [0.2, 0.8]
-    default_config = st.session_state.get("default_config", {})
+    if controller_name:
+        default_config = get_controller_config(controller_name)
+    else:
+        default_config = st.session_state.get("default_config", {})
     if use_custom_spread_units:
         buy_spreads = [spread / 100 for spread in default_config.get("buy_spreads", [1, 2])]
         sell_spreads = [spread / 100 for spread in default_config.get("sell_spreads", [1, 2])]

@@ -1,6 +1,7 @@
 import streamlit as st
 from hummingbot.core.data_type.common import OrderType, PositionMode, TradeType
 
+from frontend.components.config_loader import get_controller_config
 from frontend.pages.config.utils import get_candles
 
 
@@ -22,7 +23,8 @@ def get_price_range_defaults(connector_name: str, trading_pair: str, interval: s
         return 40000.0, 42000.0, 44000.0  # Fallback defaults
 
 
-def user_inputs():
+def user_inputs(controller_name: str = "grid_strike"):
+    default_config = get_controller_config(controller_name)
     # Split the page into two columns for the expanders
     left_col, right_col = st.columns(2)
     with left_col:
@@ -31,28 +33,36 @@ def user_inputs():
             # Basic parameters
             c1, c2 = st.columns(2)
             with c1:
-                connector_name = st.text_input("Connector Name", value="binance_perpetual")
+                connector_name = st.text_input("Connector Name", value=default_config.get("connector_name", "binance_perpetual"))
                 # Side selection
+                side_options = ["BUY", "SELL"]
+                side_default = default_config.get("side", "BUY")
+                if hasattr(side_default, 'name'):
+                    side_default = side_default.name
                 side = st.selectbox(
                     "Side",
-                    options=["BUY", "SELL"],
-                    index=0,
+                    options=side_options,
+                    index=side_options.index(side_default) if side_default in side_options else 0,
                     help="Trading direction for the grid"
                 )
-                leverage = st.number_input("Leverage", min_value=1, value=20)
+                leverage = st.number_input("Leverage", min_value=1, value=default_config.get("leverage", 20))
             with c2:
-                trading_pair = st.text_input("Trading Pair", value="WLD-USDT")
+                trading_pair = st.text_input("Trading Pair", value=default_config.get("trading_pair", "WLD-USDT"))
                 # Amount parameter
                 total_amount_quote = st.number_input(
                     "Total Amount (Quote)",
                     min_value=0.0,
-                    value=200.0,
+                    value=float(default_config.get("total_amount_quote", 200.0)),
                     help="Total amount in quote currency to use for trading"
                 )
+                position_mode_options = ["HEDGE", "ONEWAY"]
+                pm_default = default_config.get("position_mode", "HEDGE")
+                if hasattr(pm_default, 'name'):
+                    pm_default = pm_default.name
                 position_mode = st.selectbox(
                     "Position Mode",
-                    options=["HEDGE", "ONEWAY"],
-                    index=0
+                    options=position_mode_options,
+                    index=position_mode_options.index(pm_default) if pm_default in position_mode_options else 0
                 )
             # Grid price parameters
             with c1:
@@ -64,31 +74,31 @@ def user_inputs():
                     30     # Default days for price range calculation
                 )
                 if side == "BUY":
-                    start_price = min(min_price, current_price)
-                    end_price = max(current_price, max_price)
-                    limit_price = start_price * 0.95
+                    computed_start = min(min_price, current_price)
+                    computed_end = max(current_price, max_price)
+                    computed_limit = computed_start * 0.95
                 else:
-                    start_price = max(max_price, current_price)
-                    end_price = min(current_price, min_price)
-                    limit_price = start_price * 1.05
-                # Price configuration with meaningful defaults
+                    computed_start = max(max_price, current_price)
+                    computed_end = min(current_price, min_price)
+                    computed_limit = computed_start * 1.05
+                # Price configuration: use loaded config values if available, else computed
                 start_price = st.number_input(
                     "Start Price",
-                    value=start_price,
+                    value=float(default_config.get("start_price", computed_start)),
                     format="%.2f",
                     help="Grid start price"
                 )
-                
+
                 end_price = st.number_input(
                     "End Price",
-                    value=end_price,
+                    value=float(default_config.get("end_price", computed_end)),
                     format="%.2f",
                     help="Grid end price"
                 )
-                
+
                 limit_price = st.number_input(
                     "Limit Price",
-                    value=limit_price,
+                    value=float(default_config.get("limit_price", computed_limit)),
                     format="%.2f",
                     help="Price limit to stop the strategy"
                 )
@@ -98,23 +108,23 @@ def user_inputs():
                 min_spread = st.number_input(
                     "Min Spread Between Orders",
                     min_value=0.0000,
-                    value=0.0001,
+                    value=float(default_config.get("min_spread_between_orders", 0.0001)),
                     format="%.4f",
                     help="Minimum price difference between orders",
                     step=0.0001
                 )
-                
+
                 min_order_amount = st.number_input(
                     "Min Order Amount (Quote)",
                     min_value=1.0,
-                    value=6.0,
+                    value=float(default_config.get("min_order_amount_quote", 6.0)),
                     help="Minimum amount for each order in quote currency"
                 )
-                
+
                 max_open_orders = st.number_input(
                     "Maximum Open Orders",
                     min_value=1,
-                    value=3,
+                    value=int(default_config.get("max_open_orders", 3)),
                     help="Maximum number of active orders in the grid"
                 )
         
@@ -126,43 +136,50 @@ def user_inputs():
                 max_orders_per_batch = st.number_input(
                     "Max Orders Per Batch",
                     min_value=1,
-                    value=1,
+                    value=int(default_config.get("max_orders_per_batch", 1)),
                     help="Maximum number of orders to place at once"
                 )
             with c2:
                 order_frequency = st.number_input(
                     "Order Frequency (s)",
                     min_value=1,
-                    value=2,
+                    value=int(default_config.get("order_frequency", 2)),
                     help="Time between order placements in seconds"
                 )
             with c3:
                 activation_bounds = st.number_input(
                     "Activation Bounds",
                     min_value=0.0,
-                    value=0.01,
+                    value=float(default_config.get("activation_bounds", 0.01)),
                     format="%.4f",
                     help="Price deviation to trigger updates"
                 )
         
-        # Triple barrier configuration 
+        # Triple barrier configuration
         with st.expander("Triple Barrier Configuration", expanded=True):
+            tb_config = default_config.get("triple_barrier_config", {})
             c1, c2 = st.columns(2)
             with c1:
                 # Order types
                 open_order_type_options = ["LIMIT", "LIMIT_MAKER", "MARKET"]
+                open_ot_default = tb_config.get("open_order_type", "LIMIT_MAKER")
+                if hasattr(open_ot_default, 'name'):
+                    open_ot_default = open_ot_default.name
                 open_order_type = st.selectbox(
                     "Open Order Type",
                     options=open_order_type_options,
-                    index=1,  # Default to MARKET
+                    index=open_order_type_options.index(open_ot_default) if open_ot_default in open_order_type_options else 1,
                     key="open_order_type"
                 )
-                
+
                 take_profit_order_type_options = ["LIMIT", "LIMIT_MAKER", "MARKET"]
+                tp_ot_default = tb_config.get("take_profit_order_type", "LIMIT_MAKER")
+                if hasattr(tp_ot_default, 'name'):
+                    tp_ot_default = tp_ot_default.name
                 take_profit_order_type = st.selectbox(
                     "Take Profit Order Type",
                     options=take_profit_order_type_options,
-                    index=1,  # Default to MARKET
+                    index=take_profit_order_type_options.index(tp_ot_default) if tp_ot_default in take_profit_order_type_options else 1,
                     key="tp_order_type"
                 )
 
@@ -171,23 +188,23 @@ def user_inputs():
                 take_profit = st.number_input(
                     "Take Profit",
                     min_value=0.0,
-                    value=0.0001,
+                    value=float(tb_config.get("take_profit", 0.0001)),
                     format="%.4f",
                     help="Price movement percentage for take profit"
                 )
-                
+
                 stop_loss = st.number_input(
                     "Stop Loss",
                     min_value=0.0,
-                    value=0.1,
+                    value=float(tb_config.get("stop_loss", 0.1) or 0.1),
                     format="%.4f",
                     help="Price movement percentage for stop loss (0 for none)"
                 )
-                
+
                 # Keep position parameter
                 keep_position = st.checkbox(
                     "Keep Position",
-                    value=False,
+                    value=default_config.get("keep_position", False),
                     help="Keep the position open after grid execution"
                 )
         # Chart configuration
@@ -196,14 +213,16 @@ def user_inputs():
             with c1:
                 candles_connector = st.text_input(
                     "Candles Connector",
-                    value=connector_name,  # Use same connector as trading by default
+                    value=default_config.get("candles_connector", connector_name),
                     help="Connector to fetch price data from"
                 )
             with c2:
+                interval_options = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"]
+                interval_default = default_config.get("interval", "30m")
                 interval = st.selectbox(
                     "Interval",
-                    options=["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"],
-                    index=4,  # Default to 1h
+                    options=interval_options,
+                    index=interval_options.index(interval_default) if interval_default in interval_options else 4,
                     help="Candlestick interval"
                 )
             with c3:
@@ -211,7 +230,7 @@ def user_inputs():
                     "Days to Display",
                     min_value=1,
                     max_value=365,
-                    value=30,
+                    value=int(default_config.get("days_to_visualize", 30)),
                     help="Number of days of historical data to display"
                 )
 

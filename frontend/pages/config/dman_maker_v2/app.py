@@ -1,7 +1,7 @@
 import streamlit as st
 
 from frontend.components.backtesting import backtesting_section
-from frontend.components.config_loader import get_default_config_loader
+from frontend.components.config_loader import get_default_config_loader, update_controller_config, get_config_for_save
 from frontend.components.dca_distribution import get_dca_distribution_inputs
 from frontend.components.save_config import render_save_config
 from frontend.pages.config.dman_maker_v2.user_inputs import user_inputs
@@ -14,10 +14,11 @@ from frontend.visualization.executors_distribution import create_executors_distr
 # Initialize the Streamlit page
 initialize_st_page(title="D-Man Maker V2", icon="🧙‍♂️")
 backend_api_client = get_backend_api_client()
+CONTROLLER_NAME = "dman_maker_v2"
 
 # Page content
 st.text("This tool will let you create a config for D-Man Maker V2 and upload it to the BackendAPI.")
-get_default_config_loader("dman_maker_v2")
+get_default_config_loader(CONTROLLER_NAME)
 
 inputs = user_inputs()
 with st.expander("Executor Distribution:", expanded=True):
@@ -25,7 +26,7 @@ with st.expander("Executor Distribution:", expanded=True):
                                                inputs["sell_amounts_pct"], inputs["total_amount_quote"])
     st.plotly_chart(fig, use_container_width=True)
 
-dca_inputs = get_dca_distribution_inputs()
+dca_inputs = get_dca_distribution_inputs(controller_name=CONTROLLER_NAME)
 
 st.write("### Visualizing DCA Distribution for specific Executor Level")
 st.write("---")
@@ -49,7 +50,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Combine inputs and dca_inputs into final config
 config = {**inputs, **dca_inputs}
-st.session_state["default_config"].update(config)
+update_controller_config(CONTROLLER_NAME, config)
 bt_results = backtesting_section(config, backend_api_client)
 if bt_results:
     fig = create_backtesting_figure(
@@ -65,4 +66,5 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+config_id, config_data = get_config_for_save(CONTROLLER_NAME)
+render_save_config(config_id, config_data, controller_name=CONTROLLER_NAME)
