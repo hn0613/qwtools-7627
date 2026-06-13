@@ -80,6 +80,20 @@ def get_default_config_loader(controller_name: str):
                         # Keep the original config ID
                         st.session_state[config_key]["id"] = selected_config_name
                         st.session_state[config_key]["controller_name"] = controller_name
+
+                        # Mode selection: edit in place vs save as new version
+                        config_mode = st.radio(
+                            "Operation mode",
+                            options=["edit", "new_from_existing"],
+                            format_func=lambda x: "Edit this config" if x == "edit" else "Save as new version",
+                            key=f"config_mode_{controller_name}",
+                            horizontal=True
+                        )
+                        if config_mode == "new_from_existing":
+                            st.session_state[f"config_source_id_{controller_name}"] = selected_config_name
+                            st.info(f"Based on: {selected_config_name} — original will not be modified")
+                        else:
+                            st.session_state.pop(f"config_source_id_{controller_name}", None)
                 else:
                     st.warning("No existing configs found for this controller.")
     
@@ -153,6 +167,8 @@ def reset_controller_config(controller_name: str) -> None:
     # Clear related UI state
     st.session_state.pop(f"use_default_{controller_name}", None)
     st.session_state.pop(f"config_select_{controller_name}", None)
+    st.session_state.pop(f"config_mode_{controller_name}", None)
+    st.session_state.pop(f"config_source_id_{controller_name}", None)
     
     # Clear legacy state if it matches this controller
     if st.session_state.get("default_config", {}).get("controller_name") == controller_name:
