@@ -1,9 +1,13 @@
-import nest_asyncio
 import streamlit as st
 
+from frontend.components.credentials_utils import (
+    fetch_accounts_data,
+    safe_add_credential,
+    safe_create_account,
+    safe_delete_account,
+    safe_delete_credential,
+)
 from frontend.st_utils import get_backend_api_client, initialize_st_page
-
-nest_asyncio.apply()
 
 initialize_st_page(title="Credentials", icon="🔑")
 
@@ -12,16 +16,18 @@ client = get_backend_api_client()
 NUM_COLUMNS = 4
 
 
+# ---------------------------------------------------------------------------
+# Cached connector config map — avoids re-fetching on every full-page rerun
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=300, show_spinner=False)
 def get_all_connectors_config_map():
-    # Get fresh client instance inside cached function
     connectors = client.connectors.list_connectors()
     config_map_dict = {}
     for connector_name in connectors:
         try:
             config_map = client.connectors.get_config_map(connector_name=connector_name)
             config_map_dict[connector_name] = config_map
-        except Exception as e:
-            st.warning(f"Could not get config map for {connector_name}: {e}")
+        except Exception:
             config_map_dict[connector_name] = []
     return config_map_dict
 
@@ -29,166 +35,178 @@ def get_all_connectors_config_map():
 all_connector_config_map = get_all_connectors_config_map()
 
 
+# ---------------------------------------------------------------------------
+# Shared state: fetch once per full-page load, re-fetch after mutations
+# ---------------------------------------------------------------------------
+def _refresh_state():
+    accounts, credentials = fetch_accounts_data(client)
+    st.session_state.cred_accounts = accounts
+    st.session_state.cred_credentials = credentials
+
+
+if "cred_accounts" not in st.session_state or st.session_state.get("cred_needs_refresh", True):
+    _refresh_state()
+    st.session_state.cred_needs_refresh = False
+
+
+# ---------------------------------------------------------------------------
+# Fragment 1 — Account list + management actions
+# ---------------------------------------------------------------------------
 @st.fragment
 def accounts_section():
-    # Get fresh accounts list
-    accounts = client.accounts.list_accounts()
+    accounts = st.session_state.cred_accounts
+    credentials = st.session_state.cred_credentials
 
+    # --- Display accounts and their credentials ---
     if accounts:
         n_accounts = len(accounts)
-        # Ensure master_account is first, but handle if it doesn't exist
-        if "master_account" in accounts:
-            accounts.remove("master_account")
-            accounts.insert(0, "master_account")
         for i in range(0, n_accounts, NUM_COLUMNS):
             cols = st.columns(NUM_COLUMNS)
             for j, account in enumerate(accounts[i:i + NUM_COLUMNS]):
                 with cols[j]:
-                    st.subheader(f"🏦  {account}")
-                    credentials = client.accounts.list_account_credentials(account)
-                    st.json(credentials)
+                    st.subheader(f"\U0001f3e6  {account}")
+                    cred_entries = credentials.get(account, [])
+                    if cred_entries:
+                        for entry in cred_entries:
+                            st.caption(f"\U0001f511 {entry.display_name}")
+                    else:
+                        st.caption("暂无凭证")
     else:
-        st.write("No accounts available.")
+        st.info("暂无账号，可在下方创建。")
 
     st.markdown("---")
 
-    # Account management actions
+    # --- Create / Delete Account / Delete Credential ---
     c1, c2, c3 = st.columns([1, 1, 1])
+
     with c1:
-        # Section to create a new account
-        st.header("Create a New Account")
-        new_account_name = st.text_input("New Account Name")
-        if st.button("Create Account"):
-            new_account_name = new_account_name.replace(" ", "_")
-            if new_account_name:
-                if new_account_name in accounts:
-                    st.warning(f"Account {new_account_name} already exists.")
-                    st.stop()
-                elif new_account_name == "" or all(char == "_" for char in new_account_name):
-                    st.warning("Please enter a valid account name.")
-                    st.stop()
-                response = client.accounts.add_account(new_account_name)
-                st.write(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
+        st.header("创建账号")
+        new_name = st.text_input("账号名称", key="new_account_input")
+        if st.button("创建账号", key="btn_create_account"):
+            ok, msg = safe_create_account(client, new_name, accounts)
+            if ok:
+                st.success(msg)
+                st.session_state.cred_needs_refresh = True
+                st.rerun()  # Full-page rerun to sync both fragments
             else:
-                st.write("Please enter an account name.")
+                st.error(msg)
 
     with c2:
-        # Section to delete an existing account
-        st.header("Delete an Account")
-        delete_account_name = st.selectbox("Select Account to Delete",
-                                           options=accounts if accounts else ["No accounts available"], )
-        if st.button("Delete Account"):
-            if delete_account_name and delete_account_name != "No accounts available":
-                response = client.accounts.delete_account(delete_account_name)
-                st.warning(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
+        st.header("删除账号")
+        del_options = accounts if accounts else ["—"]
+        del_account = st.selectbox("选择账号", options=del_options, key="del_account_select")
+        if st.button("删除账号", key="btn_delete_account"):
+            ok, msg = safe_delete_account(client, del_account)
+            if ok:
+                st.warning(msg)
+                st.session_state.cred_needs_refresh = True
+                st.rerun()
             else:
-                st.write("Please select a valid account.")
+                st.error(msg)
 
     with c3:
-        # Section to delete a credential from an existing account
-        st.header("Delete Credential")
-        delete_account_cred_name = st.selectbox("Select the credentials account",
-                                                options=accounts if accounts else ["No accounts available"], )
-        credentials_data = client.accounts.list_account_credentials(delete_account_cred_name)
-        # Handle different possible return formats
-        if isinstance(credentials_data, list):
-            # If it's a list of strings in format "connector.key"
-            if credentials_data and isinstance(credentials_data[0], str):
-                creds_for_account = [credential.split(".")[0] for credential in credentials_data]
-            # If it's a list of dicts, extract connector names
-            elif credentials_data and isinstance(credentials_data[0], dict):
-                creds_for_account = list(
-                    set([cred.get('connector', cred.get('connector_name', '')) for cred in credentials_data if
-                         cred.get('connector') or cred.get('connector_name')]))
-            else:
-                creds_for_account = []
-        elif isinstance(credentials_data, dict):
-            # If it's a dict with connectors as keys
-            creds_for_account = list(credentials_data.keys())
-        else:
-            creds_for_account = []
-        delete_cred_name = st.selectbox("Select a Credential to Delete",
-                                        options=creds_for_account if creds_for_account else [
-                                            "No credentials available"])
-        if st.button("Delete Credential"):
-            if (delete_account_cred_name and delete_account_cred_name != "No accounts available") and \
-                    (delete_cred_name and delete_cred_name != "No credentials available"):
-                response = client.accounts.delete_credential(delete_account_cred_name, delete_cred_name)
-                st.warning(response)
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
+        st.header("删除凭证")
+        del_cred_account = st.selectbox(
+            "选择账号", options=del_options, key="del_cred_account_select"
+        )
+        cred_entries = credentials.get(del_cred_account, [])
+        cred_options = [e.display_name for e in cred_entries] if cred_entries else ["—"]
+        del_cred_display = st.selectbox(
+            "选择凭证", options=cred_options, key="del_cred_select"
+        )
+        if st.button("删除凭证", key="btn_delete_credential"):
+            # Find the matching entry to get the correct delete_identifier
+            matching = [e for e in cred_entries if e.display_name == del_cred_display]
+            if matching:
+                ok, msg = safe_delete_credential(
+                    client, del_cred_account, matching[0].delete_identifier
+                )
+                if ok:
+                    st.warning(msg)
+                    st.session_state.cred_needs_refresh = True
                     st.rerun()
+                else:
+                    st.error(msg)
             else:
-                st.write("Please select a valid account.")
-
-    return accounts
+                st.error("未找到对应凭证，请确认选择。")
 
 
-accounts = accounts_section()
+accounts_section()
 
 st.markdown("---")
 
 
-# Section to add credentials
+# ---------------------------------------------------------------------------
+# Fragment 2 — Add credentials
+# ---------------------------------------------------------------------------
 @st.fragment
 def add_credentials_section():
-    st.header("Add Credentials")
+    accounts = st.session_state.cred_accounts
+
+    st.header("添加凭证")
     c1, c2 = st.columns([1, 1])
     with c1:
-        account_name = st.selectbox("Select Account", options=accounts if accounts else ["No accounts available"])
+        account_options = accounts if accounts else ["—"]
+        account_name = st.selectbox("选择账号", options=account_options, key="add_cred_account")
     with c2:
         all_connectors = list(all_connector_config_map.keys())
-        binance_perpetual_index = all_connectors.index(
-            "binance_perpetual") if "binance_perpetual" in all_connectors else None
-        connector_name = st.selectbox("Select Connector", options=all_connectors, index=binance_perpetual_index)
+        binance_perpetual_index = (
+            all_connectors.index("binance_perpetual")
+            if "binance_perpetual" in all_connectors
+            else 0
+        )
+        connector_name = st.selectbox(
+            "选择连接器", options=all_connectors,
+            index=binance_perpetual_index, key="add_cred_connector",
+        )
         config_map = all_connector_config_map.get(connector_name, [])
 
-    st.write(f"Configuration Map for {connector_name}:")
+    st.write(f"**{connector_name}** 的配置字段:")
     config_inputs = {}
 
-    # Custom logic for XRPL connector
+    # Custom logic for XRPL connector (preserved)
     if connector_name == "xrpl":
-        # Define custom XRPL fields with default values
         xrpl_fields = {
             "xrpl_secret_key": "",
             "wss_node_urls": "wss://xrplcluster.com,wss://s1.ripple.com,wss://s2.ripple.com",
         }
-
-        # Display XRPL-specific fields
         for field, default_value in xrpl_fields.items():
             if field == "xrpl_secret_key":
-                config_inputs[field] = st.text_input(field, type="password", key=f"{connector_name}_{field}")
+                config_inputs[field] = st.text_input(
+                    field, type="password", key=f"xrpl_{field}"
+                )
             else:
-                config_inputs[field] = st.text_input(field, value=default_value, key=f"{connector_name}_{field}")
+                config_inputs[field] = st.text_input(
+                    field, value=default_value, key=f"xrpl_{field}"
+                )
 
-        if st.button("Submit Credentials"):
-            response = client.accounts.add_credential(account_name, connector_name, config_inputs)
-            if response:
-                st.success(f"✅ Successfully added {connector_name} connector to {account_name}!")
-                try:
-                    st.rerun(scope="fragment")
-                except Exception:
-                    st.rerun()
+        if st.button("提交凭证", key="submit_xrpl"):
+            ok, msg = safe_add_credential(client, account_name, connector_name, config_inputs)
+            if ok:
+                st.success(f"\u2705 {msg}")
+                st.session_state.cred_needs_refresh = True
+                st.rerun()  # Full-page rerun — accounts section will update too
+            else:
+                st.error(msg)
     else:
-        # Default behavior for other connectors
         cols = st.columns(NUM_COLUMNS)
         for i, config in enumerate(config_map):
             with cols[i % (NUM_COLUMNS - 1)]:
-                config_inputs[config] = st.text_input(config, type="password", key=f"{connector_name}_{config}")
+                config_inputs[config] = st.text_input(
+                    config, type="password", key=f"{connector_name}_{config}"
+                )
 
         with cols[-1]:
-            if st.button("Submit Credentials"):
-                response = client.accounts.add_credential(account_name, connector_name, config_inputs)
-                st.write(response)
+            if st.button("提交凭证", key="submit_generic"):
+                ok, msg = safe_add_credential(
+                    client, account_name, connector_name, config_inputs
+                )
+                if ok:
+                    st.success(f"\u2705 {msg}")
+                    st.session_state.cred_needs_refresh = True
+                    st.rerun()
+                else:
+                    st.error(msg)
 
 
 add_credentials_section()

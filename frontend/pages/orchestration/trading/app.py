@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+from frontend.components.credentials_utils import fetch_accounts_data
 from frontend.st_utils import get_backend_api_client, initialize_st_page
 
 # Enable nested async
@@ -53,14 +54,9 @@ REFRESH_INTERVAL = 30  # seconds
 
 
 def get_accounts_and_credentials():
-    """Get available accounts and their credentials."""
+    """Get available accounts and their credentials using shared normalization."""
     try:
-        accounts_list = backend_api_client.accounts.list_accounts()
-        credentials_list = {}
-        for account in accounts_list:
-            credentials = backend_api_client.accounts.list_account_credentials(account_name=account)
-            credentials_list[account] = credentials
-        return accounts_list, credentials_list
+        return fetch_accounts_data(backend_api_client)
     except Exception as e:
         st.error(f"Failed to fetch accounts: {e}")
         return [], {}
@@ -898,30 +894,12 @@ with selection_col:
         st.stop()
 
     if selected_account and credentials_dict.get(selected_account):
-        credentials = credentials_dict[selected_account]
+        cred_entries = credentials_dict[selected_account]
 
-        # Handle different credential formats
-        if isinstance(credentials, list) and credentials:
-            # If credentials is a list of strings (connector names)
-            if isinstance(credentials[0], str):
-                # Convert string list to dict format
-                credentials = [{"connector_name": cred} for cred in credentials]
-            # If credentials is already a list of dicts, use as is
-            elif isinstance(credentials[0], dict):
-                credentials = credentials
-        elif isinstance(credentials, dict):
-            # If credentials is a dict, convert to list of dicts
-            credentials = [{"connector_name": k, **v} for k, v in credentials.items()]
-        else:
-            credentials = []
-
-        # For simplicity, just use the first credential available
-        default_cred = credentials[0] if credentials else None
-
-        if default_cred and credentials:
+        if cred_entries:
             connector = st.selectbox(
                 "📡 Exchange",
-                [cred["connector_name"] for cred in credentials],
+                [e.connector_name for e in cred_entries],
                 index=0,
                 key="connector_selector"
             )
