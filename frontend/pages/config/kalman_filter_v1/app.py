@@ -8,6 +8,8 @@ from pykalman import KalmanFilter
 
 from backend.services.backend_api_client import BackendAPIClient
 from CONFIG import BACKEND_API_HOST, BACKEND_API_PORT
+from frontend.components.config_loader import get_default_config_loader
+from frontend.components.save_config import render_save_config
 from frontend.st_utils import get_backend_api_client, initialize_st_page
 
 # Initialize the Streamlit page
@@ -47,39 +49,58 @@ def add_indicators(df, observation_covariance=1, transition_covariance=0.01, ini
 
 
 st.text("This tool will let you create a config for Kalman Filter V1 and visualize the strategy.")
+
+# Load config (supports edit/fork mode)
+get_default_config_loader("bollinger_v1")
+
+# Read defaults from session state (populated by config_loader)
+cfg = st.session_state.get("config_bollinger_v1", {})
+
 st.write("---")
 
 # Inputs for Kalman Filter configuration
 st.write("## Candles Configuration")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    connector_name = st.text_input("Connector Name", value="binance_perpetual")
-    candles_connector = st.text_input("Candles Connector", value="binance_perpetual")
+    connector_name = st.text_input("Connector Name", value=cfg.get("connector_name", "binance_perpetual"))
+    candles_connector = st.text_input("Candles Connector", value=cfg.get("candles_connector", "binance_perpetual"))
 with c2:
-    trading_pair = st.text_input("Trading Pair", value="WLD-USDT")
-    candles_trading_pair = st.text_input("Candles Trading Pair", value="WLD-USDT")
+    trading_pair = st.text_input("Trading Pair", value=cfg.get("trading_pair", "WLD-USDT"))
+    candles_trading_pair = st.text_input("Candles Trading Pair", value=cfg.get("candles_trading_pair", "WLD-USDT"))
 with c3:
-    interval = st.selectbox("Candle Interval", options=["1m", "3m", "5m", "15m", "30m"], index=1)
+    interval = st.selectbox("Candle Interval", options=["1m", "3m", "5m", "15m", "30m"],
+                            index=["1m", "3m", "5m", "15m", "30m"].index(cfg.get("interval", "3m")) if cfg.get("interval", "3m") in ["1m", "3m", "5m", "15m", "30m"] else 1)
 with c4:
     max_records = st.number_input("Max Records", min_value=100, max_value=10000, value=1000)
 
 st.write("## Positions Configuration")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    sl = st.number_input("Stop Loss (%)", min_value=0.0, max_value=100.0, value=2.0, step=0.1)
-    tp = st.number_input("Take Profit (%)", min_value=0.0, max_value=100.0, value=3.0, step=0.1)
-    take_profit_order_type = st.selectbox("Take Profit Order Type", (OrderType.LIMIT, OrderType.MARKET))
+    sl = st.number_input("Stop Loss (%)", min_value=0.0, max_value=100.0,
+                         value=cfg.get("stop_loss", 0.02) * 100, step=0.1)
+    tp = st.number_input("Take Profit (%)", min_value=0.0, max_value=100.0,
+                         value=cfg.get("take_profit", 0.03) * 100, step=0.1)
+    # Map stored order type int back to OrderType enum
+    stored_otp = cfg.get("take_profit_order_type", OrderType.LIMIT.value)
+    otp_index = 0 if stored_otp == OrderType.LIMIT.value else 1
+    take_profit_order_type = st.selectbox("Take Profit Order Type", (OrderType.LIMIT, OrderType.MARKET), index=otp_index)
 with c2:
-    ts_ap = st.number_input("Trailing Stop Activation Price (%)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-    ts_delta = st.number_input("Trailing Stop Delta (%)", min_value=0.0, max_value=100.0, value=0.3, step=0.1)
-    time_limit = st.number_input("Time Limit (minutes)", min_value=0, value=60 * 6)
+    ts = cfg.get("trailing_stop", {})
+    ts_ap = st.number_input("Trailing Stop Activation Price (%)", min_value=0.0, max_value=100.0,
+                            value=ts.get("activation_price", 0.01) * 100, step=0.1)
+    ts_delta = st.number_input("Trailing Stop Delta (%)", min_value=0.0, max_value=100.0,
+                               value=ts.get("trailing_delta", 0.003) * 100, step=0.1)
+    time_limit = st.number_input("Time Limit (minutes)", min_value=0, value=cfg.get("time_limit", 60 * 6) // 60)
 with c3:
-    executor_amount_quote = st.number_input("Executor Amount Quote", min_value=10.0, value=100.0, step=1.0)
-    max_executors_per_side = st.number_input("Max Executors Per Side", min_value=1, value=2)
-    cooldown_time = st.number_input("Cooldown Time (seconds)", min_value=0, value=300)
+    executor_amount_quote = st.number_input("Executor Amount Quote", min_value=10.0,
+                                             value=float(cfg.get("executor_amount_quote", 100.0)), step=1.0)
+    max_executors_per_side = st.number_input("Max Executors Per Side", min_value=1,
+                                              value=cfg.get("max_executors_per_side", 2))
+    cooldown_time = st.number_input("Cooldown Time (seconds)", min_value=0, value=cfg.get("cooldown_time", 300))
 with c4:
-    leverage = st.number_input("Leverage", min_value=1, value=20)
-    position_mode = st.selectbox("Position Mode", ("HEDGE", "ONEWAY"))
+    leverage = st.number_input("Leverage", min_value=1, value=cfg.get("leverage", 20))
+    position_mode = st.selectbox("Position Mode", ("HEDGE", "ONEWAY"),
+                                 index=0 if cfg.get("position_mode", "HEDGE") == "HEDGE" else 1)
 
 st.write("## Kalman Filter Configuration")
 c1, c2 = st.columns(2)
@@ -178,16 +199,8 @@ fig.update_yaxes(
 # Use Streamlit's functionality to display the plot
 st.plotly_chart(fig, use_container_width=True)
 
-c1, c2, c3 = st.columns([2, 2, 1])
-
-with c1:
-    config_base = st.text_input("Config Base", value=f"bollinger_v1-{connector_name}-{trading_pair.split('-')[0]}")
-with c2:
-    config_tag = st.text_input("Config Tag", value="1.1")
-
-id = f"{config_base}-{config_tag}"
+# Build config dict (time_limit converted back to seconds, SL/TP back to decimal)
 config = {
-    "id": id,
     "controller_name": "bollinger_v1",
     "controller_type": "directional_trading",
     "manual_kill_switch": False,
@@ -201,7 +214,7 @@ config = {
     "position_mode": position_mode,
     "stop_loss": sl / 100,
     "take_profit": tp / 100,
-    "time_limit": time_limit,
+    "time_limit": int(time_limit * 60),
     "take_profit_order_type": take_profit_order_type.value,
     "trailing_stop": {
         "activation_price": ts_ap / 100,
@@ -212,25 +225,21 @@ config = {
     "interval": interval,
 }
 
+# Merge into controller-specific session state
+st.session_state["config_bollinger_v1"].update(config)
+
+# YAML download (kept as supplementary option)
 yaml_config = yaml.dump(config, default_flow_style=False)
+config_id = st.session_state["config_bollinger_v1"].get("id", "kalman_config")
+st.download_button(
+    label="Download YAML",
+    data=yaml_config,
+    file_name=f'{config_id.lower()}.yml',
+    mime='text/yaml'
+)
 
-with c3:
-    download_config = st.download_button(
-        label="Download YAML",
-        data=yaml_config,
-        file_name=f'{id.lower()}.yml',
-        mime='text/yaml'
-    )
-    upload_config_to_backend = st.button("Upload Config to Hummingbot-API")
-
-if upload_config_to_backend:
-    backend_api_client = get_backend_api_client()
-    try:
-        config_name = config.get("id", id)
-        backend_api_client.controllers.create_or_update_controller_config(
-            config_name=config_name,
-            config=config
-        )
-        st.success("Config uploaded successfully!")
-    except Exception as e:
-        st.error(f"Failed to upload config: {e}")
+# Render standard save/upload component
+render_save_config(
+    st.session_state["config_bollinger_v1"]["id"],
+    st.session_state["config_bollinger_v1"]
+)

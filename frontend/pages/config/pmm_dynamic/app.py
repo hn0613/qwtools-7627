@@ -66,7 +66,7 @@ inputs["buy_spreads"] = [spread * 100 for spread in buy_spread_distributions]
 inputs["sell_spreads"] = [spread * 100 for spread in sell_spread_distributions]
 inputs["buy_amounts_pct"] = buy_order_amounts_pct
 inputs["sell_amounts_pct"] = sell_order_amounts_pct
-st.session_state["default_config"].update(inputs)
+st.session_state["config_pmm_dynamic"].update(inputs)
 with st.expander("Executor Distribution:", expanded=True):
     natr_avarage = spreads_multiplier.mean()
     buy_spreads = [spread * natr_avarage for spread in inputs["buy_spreads"]]
@@ -91,4 +91,4 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+render_save_config(st.session_state["config_pmm_dynamic"]["id"], st.session_state["config_pmm_dynamic"])

@@ -49,7 +49,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Combine inputs and dca_inputs into final config
 config = {**inputs, **dca_inputs}
-st.session_state["default_config"].update(config)
+st.session_state["config_dman_maker_v2"].update(config)
 bt_results = backtesting_section(config, backend_api_client)
 if bt_results:
     fig = create_backtesting_figure(
@@ -65,4 +65,4 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+render_save_config(st.session_state["config_dman_maker_v2"]["id"], st.session_state["config_dman_maker_v2"])

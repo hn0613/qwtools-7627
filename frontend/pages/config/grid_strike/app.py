@@ -58,7 +58,7 @@ backend_api_client = get_backend_api_client()
 get_default_config_loader("grid_strike")
 # User inputs
 inputs = user_inputs()
-st.session_state["default_config"].update(inputs)
+st.session_state["config_grid_strike"].update(inputs)
 
 # Load candle data
 candles = get_candles(
@@ -157,5 +157,5 @@ def prepare_config_for_save(config):
 
 
 # Render save config component
-render_save_config(st.session_state["default_config"]["id"],
-                   prepare_config_for_save(st.session_state["default_config"])) 
+render_save_config(st.session_state["config_grid_strike"]["id"],
+                   prepare_config_for_save(st.session_state["config_grid_strike"])) 

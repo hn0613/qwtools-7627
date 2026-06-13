@@ -21,7 +21,7 @@ get_default_config_loader("pmm_simple")
 
 inputs = user_inputs()
 
-st.session_state["default_config"].update(inputs)
+st.session_state["config_pmm_simple"].update(inputs)
 with st.expander("Executor Distribution:", expanded=True):
     fig = create_executors_distribution_traces(inputs["buy_spreads"], inputs["sell_spreads"], inputs["buy_amounts_pct"],
                                                inputs["sell_amounts_pct"], inputs["total_amount_quote"])
@@ -42,4 +42,4 @@ if bt_results:
         st.write("---")
         render_close_types(bt_results["results"])
 st.write("---")
-render_save_config(st.session_state["default_config"]["id"], st.session_state["default_config"])
+render_save_config(st.session_state["config_pmm_simple"]["id"], st.session_state["config_pmm_simple"])
